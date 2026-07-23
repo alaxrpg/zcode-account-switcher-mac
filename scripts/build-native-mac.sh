@@ -77,7 +77,19 @@ cat << 'EOF' > "$APP_BUNDLE/Contents/Info.plist"
 </plist>
 EOF
 
+# Package as DMG Disk Image
+DMG_PATH="$DIST_DIR/ZCode.Account.Switcher.macOS.v1.0.0.dmg"
+DMG_TEMP_DIR="$DIST_DIR/dmg_temp"
+rm -rf "$DMG_PATH" "$DMG_TEMP_DIR"
+mkdir -p "$DMG_TEMP_DIR"
+cp -R "$APP_BUNDLE" "$DMG_TEMP_DIR/"
+ln -s /Applications "$DMG_TEMP_DIR/Applications"
+
+hdiutil create -volname "ZCode Account Switcher" -srcfolder "$DMG_TEMP_DIR" -ov -format UDZO "$DMG_PATH" > /dev/null
+rm -rf "$DMG_TEMP_DIR"
+
 echo "================================================="
-echo "Successfully built Native macOS Application!"
-echo "Bundle location: $APP_BUNDLE"
+echo "Successfully built Native macOS Application & DMG!"
+echo "App location: $APP_BUNDLE"
+echo "DMG location: $DMG_PATH"
 echo "================================================="

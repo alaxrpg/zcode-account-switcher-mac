@@ -27,6 +27,18 @@
 
 ## 🚀 编译与构建 (Build & Run)
 
+## 下载
+
+从 GitHub Releases 下载最新 macOS 原生 DMG 安装包：
+
+https://github.com/alaxrpg/zcode-account-switcher-mac/releases
+
+推荐下载：
+
+```text
+ZCode.Account.Switcher.macOS.v1.0.0.dmg
+```
+
 在 Mac 上克隆本项目并使用脚本进行一键原生打包：
 
 ```bash
