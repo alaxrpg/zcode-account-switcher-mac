@@ -18,6 +18,14 @@ struct ProfileManager {
     static var credentialsFile: URL {
         return URL(fileURLWithPath: (NSHomeDirectory() as NSString).appendingPathComponent(".zcode/v2/credentials.json"))
     }
+
+    /// config.json holds plaintext per-provider apiKeys (e.g. builtin:bigmodel),
+    /// a SECOND account-identity store independent of the encrypted credentials.json.
+    /// If not captured/restored alongside credentials.json, requests keep hitting
+    /// the OLD account's apiKey after a switch.
+    static var configFile: URL {
+        return URL(fileURLWithPath: (NSHomeDirectory() as NSString).appendingPathComponent(".zcode/v2/config.json"))
+    }
     
     static func maskIdentity(_ value: String?) -> String? {
         guard let text = value?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
@@ -161,21 +169,41 @@ struct ProfileManager {
         let targetProfileDir = profilesRoot.appendingPathComponent(resolvedId)
         let credentialsDataDir = targetProfileDir.appendingPathComponent("data/credentials")
         try fm.createDirectory(at: credentialsDataDir, withIntermediateDirectories: true)
-        
+
         let sourceCredentials = credentialsFile
         guard fm.fileExists(atPath: sourceCredentials.path) else {
             throw NSError(domain: "ProfileManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "没有找到 ~/.zcode/v2/credentials.json 凭据文件"])
         }
-        
+
         let destCredentials = credentialsDataDir.appendingPathComponent("credentials.json")
         if fm.fileExists(atPath: destCredentials.path) {
             try fm.removeItem(at: destCredentials)
         }
         try fm.copyItem(at: sourceCredentials, to: destCredentials)
-        
+
+        // Capture config.json (plaintext per-provider apiKeys) as a second identity store.
+        // It is optional: a fresh install may not have it yet, but if present it MUST be
+        // restored together with credentials.json or requests will hit the old account.
+        // Stored ENCRYPTED (config.json.enc) because it contains plaintext apiKeys —
+        // same AES-256-GCM key as ZCode's own credentials, so it only decrypts on this machine.
+        var captured: [CapturedTarget] = [
+            CapturedTarget(id: "credentials", type: "file", captured: true, required: true, error: nil)
+        ]
+        if fm.fileExists(atPath: configFile.path) {
+            let destConfigEnc = credentialsDataDir.appendingPathComponent("config.json.enc")
+            if let plainData = try? Data(contentsOf: configFile),
+               let plain = String(data: plainData, encoding: .utf8),
+               let enc = CredentialDecryptor.encrypt(plain) {
+                try enc.write(to: destConfigEnc, atomically: true, encoding: .utf8)
+                captured.append(CapturedTarget(id: "config", type: "file", captured: true, required: false, error: nil))
+            } else {
+                captured.append(CapturedTarget(id: "config", type: "file", captured: false, required: false, error: "config.json 读取或加密失败"))
+            }
+        } else {
+            captured.append(CapturedTarget(id: "config", type: "file", captured: false, required: false, error: "config.json not found; only credentials.json captured"))
+        }
+
         let now = ISO8601DateFormatter().string(from: Date())
-        let captured = [CapturedTarget(id: "credentials", type: "file", captured: true, required: true, error: nil)]
-        
         let manifest = ProfileManifest(
             id: resolvedId,
             version: 1,
@@ -208,26 +236,61 @@ struct ProfileManager {
         guard fm.fileExists(atPath: targetCredentialsSnapshot.path) else {
             throw NSError(domain: "ProfileManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "快照凭据文件损坏或丢失"])
         }
-        
-        // Step 1: Backup current credentials
+
+        // Encrypted config snapshot (plaintext apiKeys). Falls back to legacy plaintext name.
+        let targetConfigEnc = profileDir.appendingPathComponent("data/credentials/config.json.enc")
+        let targetConfigLegacy = profileDir.appendingPathComponent("data/credentials/config.json")
+
+        // Step 1: Backup current credentials + config (if present)
         let nowTimestamp = Int(Date().timeIntervalSince1970 * 1000)
         let backupDir = backupsRoot.appendingPathComponent("before-\(id)-\(nowTimestamp)")
         let backupDataDir = backupDir.appendingPathComponent("data/credentials")
         try fm.createDirectory(at: backupDataDir, withIntermediateDirectories: true)
-        
+
         if fm.fileExists(atPath: credentialsFile.path) {
             let backupFile = backupDataDir.appendingPathComponent("credentials.json")
             try fm.copyItem(at: credentialsFile, to: backupFile)
         }
-        
+        if fm.fileExists(atPath: configFile.path) {
+            let backupConfig = backupDataDir.appendingPathComponent("config.json")
+            try fm.copyItem(at: configFile, to: backupConfig)
+        }
+
         // Step 2: Overwrite credentials.json
         let destDir = credentialsFile.deletingLastPathComponent()
         try fm.createDirectory(at: destDir, withIntermediateDirectories: true)
-        
+
         if fm.fileExists(atPath: credentialsFile.path) {
             try fm.removeItem(at: credentialsFile)
         }
         try fm.copyItem(at: targetCredentialsSnapshot, to: credentialsFile)
+
+        // Step 3: Overwrite config.json (plaintext apiKeys) if the snapshot captured it.
+        // This is the fix for "requests keep hitting the previous account": without restoring
+        // config.json, the per-provider apiKey still belongs to the old account.
+        // Decrypts config.json.enc on restore (legacy plaintext fallback supported).
+        let hasConfigSnapshot = fm.fileExists(atPath: targetConfigEnc.path) || fm.fileExists(atPath: targetConfigLegacy.path)
+        if hasConfigSnapshot {
+            let configDir = configFile.deletingLastPathComponent()
+            try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
+
+            var restoredConfig: Data? = nil
+            if fm.fileExists(atPath: targetConfigEnc.path),
+               let enc = try? String(contentsOf: targetConfigEnc, encoding: .utf8),
+               let plainData = CredentialDecryptor.decryptToData(enc) {
+                restoredConfig = plainData
+            } else if fm.fileExists(atPath: targetConfigLegacy.path) {
+                // Legacy plaintext snapshot (pre-encryption) — migrate as-is.
+                restoredConfig = try? Data(contentsOf: targetConfigLegacy)
+            }
+
+            if let data = restoredConfig {
+                if fm.fileExists(atPath: configFile.path) {
+                    try fm.removeItem(at: configFile)
+                }
+                try data.write(to: configFile, options: .atomic)
+            }
+        }
     }
     
     static func deleteProfile(id: String) throws {
