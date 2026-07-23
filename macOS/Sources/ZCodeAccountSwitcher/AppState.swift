@@ -20,9 +20,29 @@ class AppState: ObservableObject {
     @Published var profileToDelete: ProfileManifest? = nil
     @Published var showDeleteConfirmation: Bool = false
     
+    private var statusTimer: Timer?
+    
     init() {
         self.currentState = ProfileManager.readCurrentAccountState()
         refreshAll()
+        startStatusPolling()
+    }
+    
+    deinit {
+        statusTimer?.invalidate()
+    }
+    
+    /// Poll ZCode process status every 3 seconds for real-time UI updates
+    private func startStatusPolling() {
+        statusTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                let running = ZCodeProcessManager.isZCodeRunning()
+                if self.isZCodeRunning != running {
+                    self.isZCodeRunning = running
+                }
+            }
+        }
     }
     
     func refreshAll() {
