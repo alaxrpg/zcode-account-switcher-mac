@@ -72,29 +72,23 @@ class AppState: ObservableObject {
     
     func switchProfile(id: String) {
         isOperating = true
-        Task {
+        Task { @MainActor in
             do {
                 let targetProfile = profiles.first(where: { $0.id == id })
                 let targetName = targetProfile?.name ?? "目标账号"
-                
+
                 try ProfileManager.restoreProfile(id: id)
-                
+
                 if restartZCodeOnSwitch && ZCodeProcessManager.isZCodeRunning() {
-                    _ = ZCodeProcessManager.stopZCode()
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
-                    try? ZCodeProcessManager.launchZCode()
+                    try await ZCodeProcessManager.relaunchZCode()
                 }
-                
-                await MainActor.run {
-                    self.refreshAll()
-                    self.isOperating = false
-                    self.presentAlert(title: "切换成功", message: "已成功切换到账号：\(targetName)")
-                }
+
+                self.refreshAll()
+                self.isOperating = false
+                self.presentAlert(title: "切换成功", message: "已成功切换到账号：\(targetName)")
             } catch {
-                await MainActor.run {
-                    self.isOperating = false
-                    self.presentAlert(title: "切换失败", message: error.localizedDescription)
-                }
+                self.isOperating = false
+                self.presentAlert(title: "切换失败", message: error.localizedDescription)
             }
         }
     }
@@ -117,19 +111,19 @@ class AppState: ObservableObject {
     }
     
     func launchZCode() {
-        do {
-            try ZCodeProcessManager.launchZCode()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        Task { @MainActor in
+            do {
+                try await ZCodeProcessManager.launchZCode()
                 self.isZCodeRunning = ZCodeProcessManager.isZCodeRunning()
+            } catch {
+                self.presentAlert(title: "启动失败", message: error.localizedDescription)
             }
-        } catch {
-            presentAlert(title: "启动失败", message: error.localizedDescription)
         }
     }
-    
+
     func stopZCode() {
-        _ = ZCodeProcessManager.stopZCode()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        Task { @MainActor in
+            _ = await ZCodeProcessManager.stopZCode()
             self.isZCodeRunning = ZCodeProcessManager.isZCodeRunning()
         }
     }

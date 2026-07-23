@@ -59,7 +59,7 @@ struct CredentialDecryptor {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] else {
             return nil
         }
-        
+
         var result: [String: String] = [:]
         for (key, val) in json {
             if let dec = decrypt(val) {
@@ -67,5 +67,47 @@ struct CredentialDecryptor {
             }
         }
         return result
+    }
+
+    // MARK: - Encryption (mirror of decrypt, same key derivation)
+
+    static func encodeBase64URL(_ data: Data) -> String {
+        data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    /// Encrypt arbitrary plaintext using the SAME key derivation as ZCode's
+    /// credential store (secret = env or darwin fallback → SHA256 → AES-256-GCM).
+    /// Output format mirrors `enc:v1:` so it can only be decrypted back on this
+    /// machine by the same secret.
+    static func encrypt(_ plaintext: String) -> String? {
+        let secretString = getCredentialSecret()
+        let secretData = Data(secretString.utf8)
+        let hashedKey = SHA256.hash(data: secretData)
+        let key = SymmetricKey(data: hashedKey)
+
+        do {
+            let sealed = try AES.GCM.seal(Data(plaintext.utf8), using: key)
+            // AES.GCM.SealedBox lays out combined = nonce(12) || ciphertext || tag(16),
+            // but sealed.combined already concatenates nonce+ct+tag. We want iv.tag.ct
+            // to mirror the decrypt() side, so build it explicitly.
+            guard let combined = sealed.combined else { return nil }
+            // combined = nonce(12) || ciphertext || tag(16)
+            let iv = combined.prefix(12)
+            let tag = combined.suffix(16)
+            let ciphertext = combined.dropFirst(12).dropLast(16)
+            return prefix + encodeBase64URL(iv) + "." + encodeBase64URL(Data(tag)) + "." + encodeBase64URL(Data(ciphertext))
+        } catch {
+            return nil
+        }
+    }
+
+    /// Decrypt a string produced by encrypt() (or ZCode's own enc:v1: format).
+    /// Convenience wrapper returning Data for file payloads.
+    static func decryptToData(_ value: String) -> Data? {
+        guard let plain = decrypt(value) else { return nil }
+        return Data(plain.utf8)
     }
 }
