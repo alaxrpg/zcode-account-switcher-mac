@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>BigModel Monitor</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>BigModel Monitor</strong>
+        <span id="count">0 logs</span>
+      </div>
+      <button id="clear" type="button">清空</button>
+    </header>
+
+    <section class="clock-card">
+      <div class="eyebrow">北京时间</div>
+      <div id="clock" class="clock">--:--:--.---</div>
+      <div id="timing-hint" class="state-reason">等待耗时样本</div>
+    </section>
+
+    <section id="captcha-card" class="state unknown" style="display:none">
+      <div class="eyebrow">验证码状态</div>
+      <div id="captcha-label" class="state-label">无</div>
+      <div id="captcha-detail" class="state-reason"></div>
+    </section>
+
+    <section id="purchase-card" class="state unknown">
+      <div class="eyebrow">是否可以购买</div>
+      <div id="purchase-label" class="state-label">未知</div>
+      <div id="purchase-reason" class="state-reason">等待 batch-preview 返回</div>
+      <div id="purchase-time" class="state-time"></div>
+    </section>
+
+    <section class="actions">
+      <button id="auto-purchase" type="button" class="btn-primary">开始自动抢购</button>
+      <button id="scroll" type="button">滚到套餐区</button>
+      <button id="refresh" type="button">刷新当前页一次</button>
+      <button id="export" type="button">导出日志 JSON</button>
+    </section>
+
+    <section class="settings">
+      <h2>优先配置</h2>
+      <label>
+        套餐优先级
+        <select id="tier-priority">
+          <option value="pro,max,lite">Pro > Max > Lite</option>
+          <option value="max,pro,lite">Max > Pro > Lite</option>
+          <option value="lite,pro,max">Lite > Pro > Max</option>
+          <option value="pro,lite,max">Pro > Lite > Max</option>
+        </select>
+      </label>
+      <label>
+        自动跳转顺序
+        <select id="period-priority">
+          <option value="quarter,month,year">连续包季 > 连续包月 > 连续包年</option>
+          <option value="month,quarter,year">连续包月 > 连续包季 > 连续包年</option>
+          <option value="year,quarter,month">连续包年 > 连续包季 > 连续包月</option>
+          <option value="month,year,quarter">连续包月 > 连续包年 > 连续包季</option>
+        </select>
+      </label>
+    </section>
+
+    <section>
+      <h2>自动抢购</h2>
+      <div id="auto-purchase-log" class="state-reason">未启动</div>
+    </section>
+
+    <section>
+      <h2>商品状态</h2>
+      <div id="products" class="products">暂无商品状态</div>
+    </section>
+
+    <section>
+      <h2>请求耗时与线路</h2>
+      <div id="latency" class="metrics">暂无 batch-preview 耗时</div>
+    </section>
+
+    <section>
+      <h2>最新接口</h2>
+      <pre id="latest">暂无日志</pre>
+    </section>
+
+    <section>
+      <h2>最近日志</h2>
+      <pre id="logs"></pre>
+    </section>
+
+    <script src="shared.js"></script>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

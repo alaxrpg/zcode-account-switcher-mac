@@ -1,0 +1,16 @@
+node_modules/
+.playwright-mcp/
+.zcode-inspect/
+dist/
+build/
+out/
+*.log
+ui-status-*.png
+ui-release-*.png
+zcode-lucide-preview.png
+.DS_Store
+.cache/
+*.swiftmodule
+modules.timestamp
+macOS/.build/
+macOS/Resources/AppIcon.iconset/
