@@ -50,21 +50,16 @@ struct LiquidGlassMacOS27ButtonStyle: ButtonStyle {
         .foregroundColor(isDestructive ? .red : (isProminent ? .blue : .primary))
         .padding(.horizontal, 15)
         .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
         .background(
-            ZStack {
-                // 1. Deep HUD Frosted Glass Base
-                VisualEffectBlur(material: .hudWindow, blendingMode: .withinWindow)
-                
-                // 2. Crystal Specular Top-Down Light Reflective Sheen
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(configuration.isPressed ? 0.55 : 0.40),
-                        Color.white.opacity(configuration.isPressed ? 0.20 : 0.12)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(configuration.isPressed ? 0.55 : 0.40),
+                    Color.white.opacity(configuration.isPressed ? 0.20 : 0.12)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         )
         .clipShape(Capsule())
         .overlay(
@@ -105,10 +100,7 @@ struct LiquidGlassMacOS27IconButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         ZStack {
-            // 1. Deep HUD Frosted Glass Base
-            VisualEffectBlur(material: .hudWindow, blendingMode: .withinWindow)
-            
-            // 2. Crystal Specular Top-Down Reflective Lens Sheen
+            // 1. Crystal Specular Top-Down Reflective Lens Sheen
             LinearGradient(
                 colors: [
                     Color.white.opacity(configuration.isPressed ? 0.55 : 0.40),
@@ -123,6 +115,7 @@ struct LiquidGlassMacOS27IconButtonStyle: ButtonStyle {
                 .foregroundColor(isDestructive ? .red : .primary)
         }
         .frame(width: diameter, height: diameter)
+        .background(.ultraThinMaterial)
         .clipShape(Circle())
         .overlay(
             // 3. Pure White Liquid Glass Circle Specular Ring (Zero Artificial Red/Blue Glow)
@@ -167,8 +160,6 @@ struct DualLayerGlassContainer<Content: View>: View {
 
     var body: some View {
         ZStack {
-            VisualEffectBlur(material: .hudWindow, blendingMode: .withinWindow)
-            
             LinearGradient(
                 colors: [
                     Color.white.opacity(0.42),
@@ -181,6 +172,7 @@ struct DualLayerGlassContainer<Content: View>: View {
             content
                 .padding(22)
         }
+        .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
             // Pure White Pure Crystal Dual-Layer Edge Specular Ring (Zero Blue Glow)
@@ -213,12 +205,10 @@ struct InnerGlassPill<Content: View>: View {
 
     var body: some View {
         ZStack {
-            VisualEffectBlur(material: .menu, blendingMode: .withinWindow)
-            
             LinearGradient(
                 colors: [
                     Color.white.opacity(0.4),
-                    Color.white.opacity(0.18)
+                    Color.white.opacity(0.12)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -226,6 +216,7 @@ struct InnerGlassPill<Content: View>: View {
             
             content
         }
+        .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -233,7 +224,7 @@ struct InnerGlassPill<Content: View>: View {
                     LinearGradient(
                         colors: [
                             Color.white.opacity(0.85),
-                            Color.white.opacity(0.25)
+                            Color.white.opacity(0.2)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -507,43 +498,53 @@ struct ProfilesDetailView: View {
     }
 }
 
-// MARK: - Quota Cards SwiftUI View (Apple Official Adaptive ViewThatFits Layout)
+// MARK: - Quota Cards SwiftUI View (Single-Pass Fast Layout & Redacted Skeleton)
 struct QuotaCardsSwiftUIView: View {
     let quota: QuotaSnapshot?
+    var isLoading: Bool = false
 
     var items: [QuotaLimitItem] {
         quota?.items ?? []
     }
 
     var body: some View {
-        if let q = quota, q.available, !items.isEmpty {
-            ViewThatFits(in: .horizontal) {
-                // Tier 1: Standard Horizontal Row (Wide Windows)
-                HStack(spacing: 14) {
+        Group {
+            if isLoading || quota == nil {
+                // Apple Official .redacted(reason: .placeholder) Loading Skeleton State
+                HStack(spacing: 8) {
+                    QuotaItemSkeletonView()
+                    QuotaItemSkeletonView()
+                    QuotaItemSkeletonView()
+                }
+                .redacted(reason: .placeholder)
+            } else if let q = quota, q.available, !items.isEmpty {
+                // Single-Pass High-Performance Adaptive Row
+                HStack(spacing: 8) {
                     ForEach(items) { item in
                         QuotaItemColumnView(item: item)
-                    }
-                }
-
-                // Tier 2: Compact Horizontal Row (Medium Windows)
-                HStack(spacing: 6) {
-                    ForEach(items) { item in
-                        QuotaItemColumnView(item: item)
-                    }
-                }
-
-                // Tier 3: Compact Wrapped Stack (Narrow Windows)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        if items.count > 0 { QuotaItemColumnView(item: items[0]) }
-                        if items.count > 1 { QuotaItemColumnView(item: items[1]) }
-                    }
-                    if items.count > 2 {
-                        QuotaItemColumnView(item: items[2])
                     }
                 }
             }
         }
+    }
+}
+
+struct QuotaItemSkeletonView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 3) {
+                Text("5小时")
+                    .font(.system(size: 11, weight: .regular))
+                Text("88%")
+                    .font(.system(size: 12, weight: .bold))
+                Text("· 20:00")
+                    .font(.system(size: 10, weight: .regular))
+            }
+            Capsule()
+                .fill(Color.primary.opacity(0.12))
+                .frame(height: 4)
+        }
+        .frame(minWidth: 64, idealWidth: 88, maxWidth: 100)
     }
 }
 
@@ -585,12 +586,18 @@ struct QuotaItemColumnView: View {
                 }
             }
 
-            // Apple Native Hardware-Accelerated Linear Progress Indicator
-            ProgressView(value: Double(max(0, min(100, item.percentage))), total: 100.0)
-                .progressViewStyle(.linear)
-                .tint(fillColor)
-                .frame(height: 4)
-                .clipShape(Capsule())
+            // Pure Specular Capsule Fill Bar (Focus Independent - Never turns gray on window defocus)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.12))
+
+                    Capsule()
+                        .fill(fillColor)
+                        .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(item.percentage) / 100.0)))
+                }
+            }
+            .frame(height: 4)
         }
         .frame(minWidth: 64, idealWidth: 88, maxWidth: 110)
     }
@@ -618,7 +625,7 @@ struct HeroAccountCard: View {
 
                 Spacer(minLength: 8)
 
-                QuotaCardsSwiftUIView(quota: appState.currentState.quota)
+                QuotaCardsSwiftUIView(quota: appState.currentState.quota, isLoading: appState.isQuotaLoading)
 
                 Spacer(minLength: 8)
 
@@ -695,8 +702,8 @@ struct ProfileRowView: View {
 
                 Spacer(minLength: 6)
 
-                // 额度三栏进度条 (支持窗口宽/窄自适应)
-                QuotaCardsSwiftUIView(quota: profile.quota)
+                // 额度三栏进度条 (接入 Apple Redacted Placeholder 加载状态)
+                QuotaCardsSwiftUIView(quota: profile.quota, isLoading: false)
 
                 Spacer(minLength: 6)
 

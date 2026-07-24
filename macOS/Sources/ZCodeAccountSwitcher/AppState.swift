@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import AppKit
+import SwiftUI
 
 @MainActor
 class AppState: ObservableObject {
@@ -15,6 +16,8 @@ class AppState: ObservableObject {
     @Published var showingSaveModal: Bool = false
     @Published var customProfileName: String = ""
     @Published var selectedTab: SidebarTab = .overview
+    
+    @Published var isQuotaLoading: Bool = true
     
     // Delete Confirmation Dialog State
     @Published var profileToDelete: ProfileManifest? = nil
@@ -49,11 +52,14 @@ class AppState: ObservableObject {
         self.currentState = ProfileManager.readCurrentAccountState()
         self.profiles = ProfileManager.listProfiles()
         self.isZCodeRunning = ZCodeProcessManager.isZCodeRunning()
+        self.isQuotaLoading = true
 
         Task {
             let currentQuota = await ProfileManager.fetchCurrentAccountQuota()
             await MainActor.run {
-                self.currentState.quota = currentQuota
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    self.currentState.quota = currentQuota
+                }
             }
 
             for index in self.profiles.indices {
@@ -61,8 +67,16 @@ class AppState: ObservableObject {
                 let profileQuota = await ProfileManager.fetchProfileQuota(profileId: p.id)
                 await MainActor.run {
                     if index < self.profiles.count {
-                        self.profiles[index].quota = profileQuota
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            self.profiles[index].quota = profileQuota
+                        }
                     }
+                }
+            }
+
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    self.isQuotaLoading = false
                 }
             }
         }
