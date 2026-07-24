@@ -64,7 +64,7 @@ cat << 'EOF' > "$APP_BUNDLE/Contents/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.0</string>
+    <string>1.1.1</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
@@ -78,7 +78,7 @@ cat << 'EOF' > "$APP_BUNDLE/Contents/Info.plist"
 EOF
 
 # Package as DMG Disk Image
-DMG_PATH="$DIST_DIR/ZCode.Account.Switcher.macOS.v1.1.0.dmg"
+DMG_PATH="$DIST_DIR/ZCode.Account.Switcher.macOS.v1.1.1.dmg"
 DMG_TEMP_DIR="$DIST_DIR/dmg_temp"
 rm -rf "$DMG_PATH" "$DMG_TEMP_DIR"
 mkdir -p "$DMG_TEMP_DIR"
