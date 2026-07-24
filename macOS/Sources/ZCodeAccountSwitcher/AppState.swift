@@ -24,15 +24,19 @@ class AppState: ObservableObject {
     @Published var showDeleteConfirmation: Bool = false
     
     private var statusTimer: Timer?
+    private var quotaTimer: Timer?
+    private var isQuotaRefreshing: Bool = false
     
     init() {
         self.currentState = ProfileManager.readCurrentAccountState()
         refreshAll()
         startStatusPolling()
+        startQuotaPolling()
     }
     
     deinit {
         statusTimer?.invalidate()
+        quotaTimer?.invalidate()
     }
     
     /// Poll ZCode process status every 3 seconds for real-time UI updates
@@ -43,6 +47,28 @@ class AppState: ObservableObject {
                 let running = ZCodeProcessManager.isZCodeRunning()
                 if self.isZCodeRunning != running {
                     self.isZCodeRunning = running
+                }
+            }
+        }
+    }
+    
+    /// Poll quota data every 5 minutes for automatic refresh without skeleton UI
+    private func startQuotaPolling() {
+        quotaTimer = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self, !self.isQuotaRefreshing else { return }
+                self.isQuotaRefreshing = true
+                defer { self.isQuotaRefreshing = false }
+                
+                let currentQuota = await ProfileManager.fetchCurrentAccountQuota()
+                self.currentState.quota = currentQuota
+                
+                for index in self.profiles.indices {
+                    let p = self.profiles[index]
+                    let profileQuota = await ProfileManager.fetchProfileQuota(profileId: p.id)
+                    if index < self.profiles.count {
+                        self.profiles[index].quota = profileQuota
+                    }
                 }
             }
         }
