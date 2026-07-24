@@ -103,6 +103,36 @@ struct ProfileManager {
             stableId: stableId
         )
     }
+
+    static func fetchCurrentAccountQuota() async -> QuotaSnapshot {
+        let plainCredentials = CredentialDecryptor.readPlainCredentials()
+        let configData = try? Data(contentsOf: configFile)
+        return await QuotaFetcher.fetchQuota(credentials: plainCredentials, configData: configData)
+    }
+
+    static func fetchProfileQuota(profileId: String) async -> QuotaSnapshot {
+        let profileDir = profilesRoot.appendingPathComponent(profileId)
+        let credentialsSnapshot = profileDir.appendingPathComponent("data/credentials/credentials.json")
+        let configEnc = profileDir.appendingPathComponent("data/credentials/config.json.enc")
+        let configLegacy = profileDir.appendingPathComponent("data/credentials/config.json")
+
+        var plainCredentials: [String: String]? = nil
+        if let rawData = try? Data(contentsOf: credentialsSnapshot) {
+            plainCredentials = CredentialDecryptor.parsePlainCredentials(data: rawData)
+        }
+
+        var configData: Data? = nil
+        if let encStr = try? String(contentsOf: configEnc, encoding: .utf8),
+           let decData = CredentialDecryptor.decryptToData(encStr) {
+            configData = decData
+        } else if let legacyData = try? Data(contentsOf: configLegacy) {
+            configData = legacyData
+        } else {
+            configData = try? Data(contentsOf: configFile)
+        }
+
+        return await QuotaFetcher.fetchQuota(credentials: plainCredentials, configData: configData)
+    }
     
     static func safeId(name: String, stablePart: String) -> String {
         let cleaned = name.lowercased()
@@ -211,6 +241,7 @@ struct ProfileManager {
             createdAt: matchingExisting?.createdAt ?? now,
             updatedAt: now,
             account: accountState,
+            quota: accountState.quota,
             captured: captured,
             snapshotReady: true,
             pendingSnapshot: false

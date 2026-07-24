@@ -55,8 +55,14 @@ struct CredentialDecryptor {
     
     static func readPlainCredentials() -> [String: String]? {
         let path = (NSHomeDirectory() as NSString).appendingPathComponent(".zcode/v2/credentials.json")
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] else {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+            return nil
+        }
+        return parsePlainCredentials(data: data)
+    }
+
+    static func parsePlainCredentials(data: Data) -> [String: String]? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] else {
             return nil
         }
 

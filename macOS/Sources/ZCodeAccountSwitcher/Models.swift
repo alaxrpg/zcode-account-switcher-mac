@@ -26,12 +26,42 @@ struct UserProfile: Codable, Identifiable, Equatable {
     }
 }
 
+public struct QuotaLimitItem: Codable, Identifiable, Equatable {
+    public var id: String { key }
+    public let key: String
+    public let label: String
+    public let percentage: Int
+    public let resetTime: String?
+    public let colorName: String
+
+    public init(key: String, label: String, percentage: Int, resetTime: String?, colorName: String) {
+        self.key = key
+        self.label = label
+        self.percentage = percentage
+        self.resetTime = resetTime
+        self.colorName = colorName
+    }
+}
+
+public struct QuotaSnapshot: Codable, Equatable {
+    public let available: Bool
+    public let level: String?
+    public let items: [QuotaLimitItem]
+
+    public init(available: Bool, level: String? = nil, items: [QuotaLimitItem] = []) {
+        self.available = available
+        self.level = level
+        self.items = items
+    }
+}
+
 struct AccountState: Codable, Equatable {
     let authenticated: Bool
     let activeProvider: String
     let profile: UserProfile?
     let displayName: String
     let stableId: String
+    var quota: QuotaSnapshot? = nil
 }
 
 struct CapturedTarget: Codable, Equatable {
@@ -49,6 +79,7 @@ struct ProfileManifest: Codable, Identifiable, Equatable {
     let createdAt: String
     var updatedAt: String
     let account: AccountState
+    var quota: QuotaSnapshot? = nil
     let captured: [CapturedTarget]
     let snapshotReady: Bool
     let pendingSnapshot: Bool

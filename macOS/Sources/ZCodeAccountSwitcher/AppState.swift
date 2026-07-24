@@ -49,6 +49,23 @@ class AppState: ObservableObject {
         self.currentState = ProfileManager.readCurrentAccountState()
         self.profiles = ProfileManager.listProfiles()
         self.isZCodeRunning = ZCodeProcessManager.isZCodeRunning()
+
+        Task {
+            let currentQuota = await ProfileManager.fetchCurrentAccountQuota()
+            await MainActor.run {
+                self.currentState.quota = currentQuota
+            }
+
+            for index in self.profiles.indices {
+                let p = self.profiles[index]
+                let profileQuota = await ProfileManager.fetchProfileQuota(profileId: p.id)
+                await MainActor.run {
+                    if index < self.profiles.count {
+                        self.profiles[index].quota = profileQuota
+                    }
+                }
+            }
+        }
     }
     
     func promptSaveModal() {

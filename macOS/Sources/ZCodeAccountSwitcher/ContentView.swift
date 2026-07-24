@@ -7,11 +7,11 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(appState: appState)
-                .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 260)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
         } detail: {
             DetailContentView(appState: appState)
         }
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minWidth: 640, idealWidth: 940, maxWidth: .infinity, minHeight: 480, idealHeight: 640, maxHeight: .infinity)
         .alert(appState.alertTitle, isPresented: $appState.showAlert) {
             Button("确定", role: .cancel) { }
         } message: {
@@ -507,40 +507,129 @@ struct ProfilesDetailView: View {
     }
 }
 
+// MARK: - Quota Cards SwiftUI View (Apple Official Adaptive ViewThatFits Layout)
+struct QuotaCardsSwiftUIView: View {
+    let quota: QuotaSnapshot?
+
+    var items: [QuotaLimitItem] {
+        quota?.items ?? []
+    }
+
+    var body: some View {
+        if let q = quota, q.available, !items.isEmpty {
+            ViewThatFits(in: .horizontal) {
+                // Tier 1: Standard Horizontal Row (Wide Windows)
+                HStack(spacing: 14) {
+                    ForEach(items) { item in
+                        QuotaItemColumnView(item: item)
+                    }
+                }
+
+                // Tier 2: Compact Horizontal Row (Medium Windows)
+                HStack(spacing: 6) {
+                    ForEach(items) { item in
+                        QuotaItemColumnView(item: item)
+                    }
+                }
+
+                // Tier 3: Compact Wrapped Stack (Narrow Windows)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        if items.count > 0 { QuotaItemColumnView(item: items[0]) }
+                        if items.count > 1 { QuotaItemColumnView(item: items[1]) }
+                    }
+                    if items.count > 2 {
+                        QuotaItemColumnView(item: items[2])
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct QuotaItemColumnView: View {
+    let item: QuotaLimitItem
+
+    var fillColor: Color {
+        switch item.colorName {
+        case "green":
+            return Color(red: 0.06, green: 0.72, blue: 0.45)
+        case "purple":
+            return Color(red: 0.54, green: 0.36, blue: 0.96)
+        default:
+            return Color(red: 0.0, green: 0.48, blue: 1.0)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 3) {
+                Text(item.label)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Text("\(item.percentage)%")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                if let reset = item.resetTime, !reset.isEmpty {
+                    Text("· \(reset)")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+
+            // Apple Native Hardware-Accelerated Linear Progress Indicator
+            ProgressView(value: Double(max(0, min(100, item.percentage))), total: 100.0)
+                .progressViewStyle(.linear)
+                .tint(fillColor)
+                .frame(height: 4)
+                .clipShape(Capsule())
+        }
+        .frame(minWidth: 64, idealWidth: 88, maxWidth: 110)
+    }
+}
+
 // MARK: - Hero Active Account Card (Apple Maps Weather Card Style Status)
 struct HeroAccountCard: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
         DualLayerGlassContainer(cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    // Apple Maps Weather Card Style Status Badge
-                    AppleMapsWeatherStatusBadge(isAuthenticated: appState.currentState.authenticated)
-                    
-                    Spacer()
-                    
-                    ProviderBadge(provider: appState.currentState.activeProvider)
-                }
-                
-                HStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(appState.currentState.displayName)
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundColor(.primary)
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        AppleMapsWeatherStatusBadge(isAuthenticated: appState.currentState.authenticated)
+                        ProviderBadge(provider: appState.currentState.activeProvider)
                     }
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        appState.promptSaveModal()
-                    }) {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(LiquidGlassMacOS27IconButtonStyle(diameter: 36))
-                    .disabled(!appState.currentState.authenticated || appState.isOperating)
-                    .help("保存当前账号为新快照")
+
+                    Text(appState.currentState.displayName)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
+
+                Spacer(minLength: 8)
+
+                QuotaCardsSwiftUIView(quota: appState.currentState.quota)
+
+                Spacer(minLength: 8)
+
+                Button(action: {
+                    appState.promptSaveModal()
+                }) {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(LiquidGlassMacOS27IconButtonStyle(diameter: 36))
+                .disabled(!appState.currentState.authenticated || appState.isOperating)
+                .help("保存当前账号为新快照")
             }
         }
     }
@@ -588,23 +677,30 @@ struct ProfileRowView: View {
 
     var body: some View {
         DualLayerGlassContainer(cornerRadius: 14) {
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(profile.name)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.primary)
-                        
-                        if isCurrent {
-                            RowActiveBadge()
-                        }
-                        
-                        ProviderBadge(provider: profile.account.activeProvider)
+            HStack(alignment: .center, spacing: 10) {
+                // Name & Status Badges (包含 "使用中")
+                HStack(spacing: 8) {
+                    Text(profile.name)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
+                    if isCurrent {
+                        RowActiveBadge()
                     }
+
+                    ProviderBadge(provider: profile.account.activeProvider)
                 }
-                
-                Spacer()
-                
+
+                Spacer(minLength: 6)
+
+                // 额度三栏进度条 (支持窗口宽/窄自适应)
+                QuotaCardsSwiftUIView(quota: profile.quota)
+
+                Spacer(minLength: 6)
+
+                // 操作按钮
                 HStack(spacing: 10) {
                     if !isCurrent {
                         Button(action: onSwitch) {
@@ -613,7 +709,7 @@ struct ProfileRowView: View {
                         .buttonStyle(LiquidGlassMacOS27IconButtonStyle(diameter: 32))
                         .help("一键切换至此账号")
                     }
-                    
+
                     Button(action: onDelete) {
                         Image(systemName: "trash")
                     }
