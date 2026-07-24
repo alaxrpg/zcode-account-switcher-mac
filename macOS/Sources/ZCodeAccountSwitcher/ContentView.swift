@@ -586,18 +586,12 @@ struct QuotaItemColumnView: View {
                 }
             }
 
-            // Pure Specular Capsule Fill Bar (Focus Independent - Never turns gray on window defocus)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.12))
-
-                    Capsule()
-                        .fill(fillColor)
-                        .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(item.percentage) / 100.0)))
-                }
-            }
-            .frame(height: 4)
+            // Apple Native Hardware-Accelerated Linear Progress Indicator
+            ProgressView(value: Double(max(0, min(100, item.percentage))), total: 100.0)
+                .progressViewStyle(.linear)
+                .tint(fillColor)
+                .frame(height: 4)
+                .clipShape(Capsule())
         }
         .frame(minWidth: 64, idealWidth: 88, maxWidth: 110)
     }
